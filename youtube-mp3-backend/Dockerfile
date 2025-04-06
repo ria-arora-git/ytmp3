@@ -1,22 +1,20 @@
 FROM node:18
 
-# Install system dependencies
+# Install ffmpeg and yt-dlp
 RUN apt-get update && \
-    apt-get install -y ffmpeg curl python3 python3-pip && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y ffmpeg curl && \
+    curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
+    chmod a+rx /usr/local/bin/yt-dlp
 
-# Set working directory
+# Create app directory
 WORKDIR /app
 
-# Copy package.json and install dependencies
+# Install app dependencies
 COPY package*.json ./
 RUN npm install
 
-# Copy the rest of the app
+# Bundle app source
 COPY . .
 
-# Expose port (make sure this matches your app)
 EXPOSE 3000
-
-# Start the app
 CMD ["node", "index.js"]
