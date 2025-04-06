@@ -1,22 +1,22 @@
 FROM node:18
 
-# Install yt-dlp and ffmpeg
+# Install system dependencies
 RUN apt-get update && \
-    apt-get install -y ffmpeg curl python3-pip && \
-    pip3 install yt-dlp
+    apt-get install -y ffmpeg curl python3 python3-pip && \
+    rm -rf /var/lib/apt/lists/*
 
-# Create app directory
+# Set working directory
 WORKDIR /app
 
-# Install dependencies
+# Copy package.json and install dependencies
 COPY package*.json ./
 RUN npm install
 
-# Copy app source
+# Copy the rest of the app
 COPY . .
 
-# Expose port
+# Expose port (make sure this matches your app)
 EXPOSE 3000
 
-# Start app
+# Start the app
 CMD ["node", "index.js"]
