@@ -19,16 +19,17 @@ app.get("/download", async (req, res) => {
   res.setHeader("Content-Disposition", "attachment; filename=audio.mp3");
   res.setHeader("Content-Type", "audio/mpeg");
 
-  const ytDlp = spawn("yt-dlp", [
+  const ytdlp = spawn("yt-dlp", [
     "-f", "bestaudio",
-    "-o", "-", // Output to stdout
+    "-o", "-",
     "--quiet",
     "--no-warnings",
     "--no-playlist",
-    "--add-header", "referer:youtube.com",
-    "--add-header", "user-agent:Mozilla/5.0",
-    videoUrl
+    "--add-header", "referer: https://www.youtube.com",
+    "--add-header", "user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    url,
   ]);
+  
 
   ytDlp.stderr.on("data", (data) => {
     console.error(`❌ yt-dlp error: ${data}`);
