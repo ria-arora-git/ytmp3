@@ -1,75 +1,67 @@
-const express = require('express');
-const { spawn } = require('child_process');
-const ffmpeg = require('fluent-ffmpeg');
-const cors = require('cors');
+const express = require("express");
+const { spawn } = require("child_process");
+const cors = require("cors");
 
 const app = express();
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 
-app.use(cors());
+app.use(cors()); // for frontend to make requests
 
-app.get('/download', async (req, res) => {
-  let url = req.query.url;
-
-  if (!url) {
-    return res.status(400).send('Missing URL');
+app.get("/download", (req, res) => {
+  const videoURL = req.query.url;
+  if (!videoURL) {
+    return res.status(400).send("Missing YouTube URL");
   }
 
-  // Convert short youtu.be links to full YouTube links
-  url = url.replace('youtu.be/', 'www.youtube.com/watch?v=');
+  console.log("🔗 Download request:", videoURL);
 
-  console.log(`🔗 Download request: ${url}`);
-  console.log(`🎵 Starting conversion`);
-
-  const ytdlp = spawn('yt-dlp', [
-    '-f', '140', // m4a format
-    '--no-check-certificate',
-    '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:114.0) Gecko/20100101 Firefox/114.0',
-    '--referer', 'https://www.youtube.com',
-    '--add-header', 'Accept-Language: en-US,en;q=0.9',
-    '-o', '-', // output to stdout
-    url
+  const ytdlp = spawn("yt-dlp", [
+    "--user-agent",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "-f",
+    "bestaudio",
+    "-o",
+    "-",
+    videoURL,
   ]);
 
-  let responseSent = false;
+  const ffmpeg = spawn("ffmpeg", [
+    "-i",
+    "pipe:0",
+    "-f",
+    "mp3",
+    "-b:a",
+    "192k",
+    "pipe:1",
+  ]);
 
-  ytdlp.stderr.on('data', (data) => {
-    const error = data.toString();
-    console.error('yt-dlp error:', error);
-    if (error.includes('ERROR:')) {
-      if (!responseSent) {
-        res.status(500).send('yt-dlp failed to download video');
-        responseSent = true;
-        ytdlp.kill();
-      }
+  res.setHeader("Content-Disposition", 'attachment; filename="audio.mp3"');
+  res.setHeader("Content-Type", "audio/mpeg");
+
+  ytdlp.stdout.pipe(ffmpeg.stdin);
+  ffmpeg.stdout.pipe(res);
+
+  ytdlp.stderr.on("data", (data) => console.error("yt-dlp error:", data.toString()));
+  ffmpeg.stderr.on("data", (data) => console.error("ffmpeg error:", data.toString()));
+
+  ytdlp.on("close", (code) => {
+    if (code !== 0) {
+      console.error(`yt-dlp exited with code ${code}`);
+      res.status(500).end();
     }
   });
 
-  const command = ffmpeg(ytdlp.stdout)
-    .audioCodec('libmp3lame')
-    .format('mp3')
-    .on('error', (err) => {
-      console.error('ffmpeg error:', err.message);
-      if (!responseSent) {
-        res.status(500).send('Conversion failed');
-        responseSent = true;
-      }
-    })
-    .on('end', () => {
-      console.log('✅ Conversion finished');
-      responseSent = true;
-    });
-
-  res.setHeader('Content-Disposition', 'attachment; filename="audio.mp3"');
-  res.setHeader('Content-Type', 'audio/mpeg');
-
-  command.pipe(res, { end: true });
+  ffmpeg.on("close", (code) => {
+    if (code !== 0) {
+      console.error(`ffmpeg exited with code ${code}`);
+    }
+    res.end();
+  });
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
-
 
 
 
