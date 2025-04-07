@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     python3 \
     yt-dlp \
+    && ln -s /usr/bin/python3 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -22,6 +23,7 @@ EXPOSE 8080
 
 # Run the app
 CMD ["node", "index.js"]
+
 
 
 
