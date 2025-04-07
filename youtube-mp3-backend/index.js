@@ -11,13 +11,14 @@ app.get("/download", async (req, res) => {
   const videoUrl = req.query.url;
   if (!videoUrl) return res.status(400).send("Missing URL");
 
-  const cleanUrl = videoUrl.split("&")[0]; // remove timestamp etc.
-  console.log(`🔗 Download request: ${cleanUrl}`);
+  const cleanUrl = videoUrl.split("&")[0];
+  console.log(`🎧 Downloading from: ${cleanUrl}`);
 
-  // Set headers for the MP3 file response
-  res.setHeader("Content-Disposition", "attachment; filename=audio.mp3");
+  // Set headers early
+  res.setHeader("Content-Disposition", `attachment; filename=audio.mp3`);
   res.setHeader("Content-Type", "audio/mpeg");
 
+  // Spawn yt-dlp
   const ytdlp = spawn("yt-dlp", [
     "-f", "bestaudio",
     "--no-playlist",
@@ -28,7 +29,10 @@ app.get("/download", async (req, res) => {
     cleanUrl
   ]);
 
+  // Spawn ffmpeg
   const ffmpeg = spawn("ffmpeg", [
+    "-hide_banner",
+    "-loglevel", "error",
     "-i", "pipe:0",
     "-f", "mp3",
     "-ab", "192000",
@@ -36,53 +40,49 @@ app.get("/download", async (req, res) => {
     "pipe:1"
   ]);
 
-  let totalBytes = 0;
+  // Pipe yt-dlp → ffmpeg
+  ytdlp.stdout.pipe(ffmpeg.stdin);
 
-  // yt-dlp stdout to ffmpeg stdin
-  ytdlp.stdout.on("data", (chunk) => {
-    totalBytes += chunk.length;
-    ffmpeg.stdin.write(chunk);
-  });
-
-  ytdlp.stdout.on("end", () => {
-    console.log(`✅ yt-dlp stream ended. Total bytes: ${totalBytes}`);
-    ffmpeg.stdin.end();
-  });
-
-  // Pipe ffmpeg output to response
+  // Pipe ffmpeg → response
   ffmpeg.stdout.pipe(res);
 
-  // Error handling
-  ytdlp.stderr.on("data", (data) => {
-    console.error("yt-dlp error:", data.toString());
+  // Log errors
+  ytdlp.stderr.on("data", data => {
+    console.error("❌ yt-dlp error:", data.toString());
   });
 
-  ffmpeg.stderr.on("data", (data) => {
-    console.error("ffmpeg error:", data.toString());
+  ffmpeg.stderr.on("data", data => {
+    console.error("❌ ffmpeg error:", data.toString());
   });
 
-  ytdlp.on("error", (err) => {
-    console.error("yt-dlp failed:", err);
+  // Log exits
+  ytdlp.on("exit", code => {
+    console.log("📦 yt-dlp exited with code", code);
+  });
+
+  ffmpeg.on("exit", code => {
+    console.log("🎛️ ffmpeg exited with code", code);
+    if (code !== 0 && !res.headersSent) {
+      res.status(500).send("Failed to process audio");
+    }
+  });
+
+  // Catch process errors
+  ytdlp.on("error", err => {
+    console.error("yt-dlp failed to start:", err);
     if (!res.headersSent) res.status(500).send("yt-dlp error");
   });
 
-  ffmpeg.on("error", (err) => {
-    console.error("ffmpeg failed:", err);
+  ffmpeg.on("error", err => {
+    console.error("ffmpeg failed to start:", err);
     if (!res.headersSent) res.status(500).send("ffmpeg error");
-  });
-
-  ytdlp.on("exit", (code) => {
-    console.log(`yt-dlp exited with code ${code}`);
-  });
-
-  ffmpeg.on("exit", (code) => {
-    console.log(`ffmpeg exited with code ${code}`);
   });
 });
 
 app.listen(port, () => {
-  console.log(`🚀 Server is running on http://localhost:${port}`);
+  console.log(`🚀 Server is running at http://localhost:${port}`);
 });
+
 
 
 
