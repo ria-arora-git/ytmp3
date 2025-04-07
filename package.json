@@ -5,6 +5,10 @@
     "license": "MIT",
     "dependencies": {
 
+    },
+    "scripts": {
+    "start": "node server.js"
     }
+
   }
   
