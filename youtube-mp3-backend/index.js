@@ -1,68 +1,67 @@
-const express = require("express");
-const cors = require("cors");
-const { spawn } = require("child_process");
+import express from "express";
+import cors from "cors";
+import { spawn } from "child_process";
+import ffmpeg from "fluent-ffmpeg";
 
 const app = express();
-const PORT = process.env.PORT || 8080;
-
 app.use(cors());
 
 app.get("/download", async (req, res) => {
-    const url = req.query.url;
+  const videoUrl = req.query.url;
 
-    if (!url) {
-        return res.status(400).send("Missing URL parameter");
+  if (!videoUrl) {
+    return res.status(400).send("❌ URL is required");
+  }
+
+  console.log(`🎧 Downloading from: ${videoUrl}`);
+
+  // Set headers early
+  res.setHeader("Content-Disposition", "attachment; filename=audio.mp3");
+  res.setHeader("Content-Type", "audio/mpeg");
+
+  const ytDlp = spawn("yt-dlp", [
+    "-f", "bestaudio",
+    "-o", "-", // Output to stdout
+    "--quiet",
+    "--no-warnings",
+    "--no-playlist",
+    "--add-header", "referer:youtube.com",
+    "--add-header", "user-agent:Mozilla/5.0",
+    videoUrl
+  ]);
+
+  ytDlp.stderr.on("data", (data) => {
+    console.error(`❌ yt-dlp error: ${data}`);
+  });
+
+  ytDlp.on("error", (err) => {
+    console.error("❌ Failed to start yt-dlp:", err);
+    if (!res.headersSent) {
+      res.status(500).send("Failed to start download.");
     }
+  });
 
-    console.log(`🎧 Downloading from: ${url}`);
-
-    const ytdlp = spawn("yt-dlp", [
-      url,
-      "-f", "bestaudio",
-      "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-      "--no-check-certificate",
-      "--no-playlist",
-      "-o", "-", // output to stdout
-      "--quiet",
-      "--no-warnings"
-    ]);
-    
-    
-
-    const ffmpeg = spawn("ffmpeg", [
-        "-i", "pipe:0",
-        "-f", "mp3",
-        "-ab", "192000",
-        "-vn",
-        "pipe:1"
-    ]);
-
-    ytdlp.stdout.pipe(ffmpeg.stdin);
-    ffmpeg.stdout.pipe(res);
-
-    ytdlp.stderr.on("data", (data) => {
-        console.error(`❌ yt-dlp error: ${data}`);
-    });
-
-    ffmpeg.stderr.on("data", (data) => {
-        console.error(`❌ ffmpeg error: ${data}`);
-    });
-
-    ytdlp.on("close", (code) => {
-        console.log(`📦 yt-dlp exited with code ${code}`);
-    });
-
-    ffmpeg.on("close", (code) => {
-        console.log(`🎛️ ffmpeg exited with code ${code}`);
-    });
+  ffmpeg(ytDlp.stdout)
+    .audioBitrate(128)
+    .format("mp3")
+    .on("error", (err) => {
+      console.error("❌ ffmpeg error:", err.message);
+      if (!res.headersSent) {
+        res.status(500).send("Failed to convert audio.");
+      } else {
+        res.end();
+      }
+    })
+    .on("end", () => {
+      console.log("✅ Conversion done");
+    })
+    .pipe(res, { end: true });
 });
 
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-    console.log(`🚀 Server is running at http://localhost:${PORT}`);
+  console.log(`🚀 Server is running at http://localhost:${PORT}`);
 });
-
-
-
 
 
 
