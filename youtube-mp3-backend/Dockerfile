@@ -1,30 +1,27 @@
 FROM node:18-slim
 
-# Install ffmpeg & dependencies
+# Install yt-dlp, ffmpeg, python
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     python3 \
-    python3-pip \
+    yt-dlp \
     && rm -rf /var/lib/apt/lists/*
-
-# Install yt-dlp via pip
-RUN pip install yt-dlp
 
 # Set working directory
 WORKDIR /app
 
-# Copy only backend code
+# Install Node dependencies
 COPY package*.json ./
 RUN npm install
 
+# Copy rest of the app
 COPY . .
 
-# Expose port (make sure it matches your Express app)
+# Expose port
 EXPOSE 8080
 
-# Start server
+# Run the app
 CMD ["node", "index.js"]
-
 
 
 
