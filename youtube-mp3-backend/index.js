@@ -7,12 +7,14 @@ const port = 8080;
 
 app.use(cors());
 
-app.get("/download", async (req, res) => {
+app.get('/download', async (req, res) => {
   const videoUrl = req.query.url;
-  if (!videoUrl) return res.status(400).send("Missing URL");
+  if (!videoUrl) {
+      return res.status(400).send('Missing URL parameter');
+  }
 
-  const cleanUrl = videoUrl.split("&")[0];
-  console.log(`🎧 Downloading from: ${cleanUrl}`);
+  console.log(`🎧 Downloading from: ${videoUrl}`);
+
 
   // Set headers early
   res.setHeader("Content-Disposition", `attachment; filename=audio.mp3`);
