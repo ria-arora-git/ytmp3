@@ -1,3 +1,4 @@
+
 #!/bin/bash
-pip install yt-dlp
+pip install -U yt-dlp
 node index.js

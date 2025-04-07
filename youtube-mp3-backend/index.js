@@ -1,62 +1,61 @@
-const express = require("express");
-const cors = require("cors");
-const { spawn } = require("child_process");
-const ffmpeg = require("fluent-ffmpeg");
+const express = require('express');
+const { spawn } = require('child_process');
+const ffmpeg = require('fluent-ffmpeg');
+const cors = require('cors');
+
 const app = express();
 const PORT = 8080;
 
 app.use(cors());
 
-app.get("/download", async (req, res) => {
-  const youtubeUrl = req.query.url;
+app.get('/download', (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).send('URL is required');
 
-  if (!youtubeUrl) {
-    return res.status(400).json({ error: "Missing YouTube URL" });
-  }
+  console.log('🔗 Download request:', url);
 
-  console.log(`🔗 Download request: ${youtubeUrl}`);
+  const ytdlp = spawn('yt-dlp', [
+    '-f', 'bestaudio',
+    '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+    '-o', '-',
+    url
+  ]);
 
-  // Set headers for the MP3 file
-  res.setHeader("Content-Disposition", 'attachment; filename="audio.mp3"');
-  res.setHeader("Content-Type", "audio/mpeg");
+  ytdlp.stderr.on('data', (data) => {
+    console.error('yt-dlp error:', data.toString());
+  });
 
-  try {
-    const ytdlp = spawn("yt-dlp", [
-      "-f",
-      "bestaudio",
-      "-o",
-      "-",
-      youtubeUrl,
-    ]);
+  ytdlp.on('error', (err) => {
+    console.error('yt-dlp spawn error:', err.message);
+    res.status(500).send('yt-dlp error');
+  });
 
-    ytdlp.stderr.on("data", (data) => {
-      console.error(`yt-dlp error: ${data}`);
-    });
+  let responseSent = false;
 
-    ytdlp.on("error", (err) => {
-      console.error("yt-dlp failed to start", err);
-      return res.status(500).send("yt-dlp error");
-    });
+  res.setHeader('Content-Disposition', 'attachment; filename="audio.mp3"');
+  res.setHeader('Content-Type', 'audio/mpeg');
 
-    const ffmpegProcess = ffmpeg()
-      .input(ytdlp.stdout)
-      .audioBitrate(128)
-      .format("mp3")
-      .on("error", (err) => {
-        console.error("ffmpeg error:", err.message);
-        res.status(500).send("ffmpeg processing error");
-      })
-      .pipe(res, { end: true });
-
-  } catch (error) {
-    console.error("Unexpected error:", error.message);
-    res.status(500).send("Unexpected error occurred");
-  }
+  ffmpeg(ytdlp.stdout)
+    .audioCodec('libmp3lame')
+    .format('mp3')
+    .on('error', (err) => {
+      console.error('ffmpeg error:', err.message);
+      if (!responseSent) {
+        res.status(500).send('Conversion failed');
+        responseSent = true;
+      }
+    })
+    .on('end', () => {
+      console.log('✅ Conversion finished');
+      responseSent = true;
+    })
+    .pipe(res, { end: true });
 });
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
+
 
 
 
