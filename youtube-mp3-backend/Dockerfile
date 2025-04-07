@@ -1,16 +1,28 @@
 FROM node:18
 
+# Install Python and ffmpeg
+RUN apt-get update && \
+    apt-get install -y python3 python3-pip ffmpeg && \
+    pip3 install yt-dlp
+
+# Create app directory
 WORKDIR /app
 
+# Copy app files
 COPY package*.json ./
+
+# Install dependencies (now Python is available)
 RUN npm install
 
-RUN apt update && apt install -y ffmpeg python3-pip
-RUN pip install yt-dlp
-
+# Copy the rest of the app
 COPY . .
 
+# Expose port
+EXPOSE 8080
+
+# Start the app
 CMD ["node", "index.js"]
+
 
 
 
