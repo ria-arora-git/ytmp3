@@ -1,77 +1,63 @@
-const express = require('express');
-const cors = require('cors');
-const { spawn } = require('child_process');
-
+const express = require("express");
+const cors = require("cors");
+const { spawn } = require("child_process");
+const ffmpeg = require("fluent-ffmpeg");
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = 8080;
 
 app.use(cors());
 
-app.get('/download', async (req, res) => {
-  const videoUrl = req.query.url;
-  if (!videoUrl) return res.status(400).send('Missing YouTube URL');
+app.get("/download", async (req, res) => {
+  const youtubeUrl = req.query.url;
 
-  console.log('🔗 Download request:', videoUrl);
+  if (!youtubeUrl) {
+    return res.status(400).json({ error: "Missing YouTube URL" });
+  }
+
+  console.log(`🔗 Download request: ${youtubeUrl}`);
+
+  // Set headers for the MP3 file
+  res.setHeader("Content-Disposition", 'attachment; filename="audio.mp3"');
+  res.setHeader("Content-Type", "audio/mpeg");
 
   try {
-    const ytdlp = spawn('yt-dlp', [
-      '-f', 'bestaudio',
-      '-g', videoUrl,
+    const ytdlp = spawn("yt-dlp", [
+      "-f",
+      "bestaudio",
+      "-o",
+      "-",
+      youtubeUrl,
     ]);
 
-    let audioUrl = '';
-    for await (const chunk of ytdlp.stdout) {
-      audioUrl += chunk.toString();
-    }
-
-    ytdlp.stderr.on('data', (data) => {
-      console.error('yt-dlp error:', data.toString());
+    ytdlp.stderr.on("data", (data) => {
+      console.error(`yt-dlp error: ${data}`);
     });
 
-    ytdlp.on('close', (code) => {
-      if (code !== 0) {
-        console.error(`yt-dlp exited with code ${code}`);
-        return res.status(500).send('Failed to get audio URL');
-      }
-
-      audioUrl = audioUrl.trim();
-      console.log('🎧 Streaming audio from:', audioUrl);
-
-      res.setHeader('Content-Disposition', 'attachment; filename="audio.mp3"');
-      res.setHeader('Content-Type', 'audio/mpeg');
-
-      const ffmpeg = spawn('ffmpeg', [
-        '-i', audioUrl,
-        '-f', 'mp3',
-        '-ab', '192000',
-        '-vn',
-        'pipe:1',
-      ]);
-
-      ffmpeg.stdout.pipe(res);
-
-      ffmpeg.stderr.on('data', (data) => {
-        console.error('ffmpeg error:', data.toString());
-      });
-
-      ffmpeg.on('close', (code) => {
-        if (code !== 0) {
-          console.error(`ffmpeg exited with code ${code}`);
-        } else {
-          console.log('✅ Stream finished');
-        }
-      });
+    ytdlp.on("error", (err) => {
+      console.error("yt-dlp failed to start", err);
+      return res.status(500).send("yt-dlp error");
     });
 
-  } catch (err) {
-    console.error('Download error:', err);
-    res.status(500).send('Error occurred during download');
+    const ffmpegProcess = ffmpeg()
+      .input(ytdlp.stdout)
+      .audioBitrate(128)
+      .format("mp3")
+      .on("error", (err) => {
+        console.error("ffmpeg error:", err.message);
+        res.status(500).send("ffmpeg processing error");
+      })
+      .pipe(res, { end: true });
+
+  } catch (error) {
+    console.error("Unexpected error:", error.message);
+    res.status(500).send("Unexpected error occurred");
   }
 });
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
+
 
 
 
