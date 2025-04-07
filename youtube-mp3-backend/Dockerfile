@@ -1,37 +1,29 @@
-# Use the official Node.js image as the base image
-FROM node:20
+FROM node:18-slim
 
-# Set the working directory for the backend
-WORKDIR /app/backend
+# Install ffmpeg & dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy backend package files and install dependencies
-COPY youtube-mp3-backend/package*.json ./
+# Install yt-dlp via pip
+RUN pip install yt-dlp
+
+# Set working directory
+WORKDIR /app
+
+# Copy only backend code
+COPY package*.json ./
 RUN npm install
 
-# Copy backend source files
-COPY youtube-mp3-backend/ .
+COPY . .
 
-# Set the working directory for the frontend
-WORKDIR /app/frontend
-
-# Copy frontend package files and install dependencies
-COPY youtube-mp3-frontend/package*.json ./
-RUN npm install
-
-# Copy frontend source files
-COPY youtube-mp3-frontend/ .
-
-# Build the frontend
-RUN npm run build
-
-# Set the working directory back to the backend
-WORKDIR /app/backend
-
-# Expose the port the app runs on
+# Expose port (make sure it matches your Express app)
 EXPOSE 8080
 
-# Start the backend server
-CMD ["npm", "start"]
+# Start server
+CMD ["node", "index.js"]
 
 
 
