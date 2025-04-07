@@ -23,6 +23,23 @@ EXPOSE 8080
 # Start server
 CMD ["node", "index.js"]
 
+FROM node:18
+
+# Install ffmpeg
+RUN apt-get update && apt-get install -y ffmpeg
+
+# Create app directory
+WORKDIR /app
+
+# Copy files
+COPY package*.json ./
+RUN npm install
+COPY . .
+
+EXPOSE 8080
+CMD ["node", "index.js"]
+
+
 
 
 
