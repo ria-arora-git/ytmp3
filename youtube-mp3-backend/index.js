@@ -1,67 +1,78 @@
-const express = require("express");
-const { spawn } = require("child_process");
-const cors = require("cors");
+const express = require('express');
+const cors = require('cors');
+const { spawn } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-app.use(cors()); // for frontend to make requests
+app.use(cors());
 
-app.get("/download", (req, res) => {
-  const videoURL = req.query.url;
-  if (!videoURL) {
-    return res.status(400).send("Missing YouTube URL");
+app.get('/download', (req, res) => {
+  const { url } = req.query;
+
+  if (!url) {
+    return res.status(400).send('Missing YouTube URL');
   }
 
-  console.log("🔗 Download request:", videoURL);
+  // Clean YouTube URL: remove tracking parameters like "?si=..."
+  const cleanUrl = url.split('?')[0];
 
-  const ytdlp = spawn("yt-dlp", [
-    "--user-agent",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    "-f",
-    "bestaudio",
-    "-o",
-    "-",
-    videoURL,
+  console.log('🔗 Download request:', cleanUrl);
+
+  // yt-dlp command to get best audio format
+  const ytdlp = spawn('yt-dlp', [
+    '-f', 'bestaudio',
+    '-o', '-', // output to stdout
+    cleanUrl,
   ]);
 
-  const ffmpeg = spawn("ffmpeg", [
-    "-i",
-    "pipe:0",
-    "-f",
-    "mp3",
-    "-b:a",
-    "192k",
-    "pipe:1",
+  // ffmpeg command to convert to MP3
+  const ffmpeg = spawn('ffmpeg', [
+    '-i', 'pipe:0',           // input from stdin
+    '-f', 'mp3',              // output format
+    '-ab', '192000',          // audio bitrate
+    '-vn',                   // no video
+    'pipe:1'                 // output to stdout
   ]);
 
-  res.setHeader("Content-Disposition", 'attachment; filename="audio.mp3"');
-  res.setHeader("Content-Type", "audio/mpeg");
+  // Set headers for download
+  res.setHeader('Content-Disposition', 'attachment; filename="audio.mp3"');
+  res.setHeader('Content-Type', 'audio/mpeg');
 
+  // Pipe yt-dlp output into ffmpeg, and ffmpeg output into response
   ytdlp.stdout.pipe(ffmpeg.stdin);
   ffmpeg.stdout.pipe(res);
 
-  ytdlp.stderr.on("data", (data) => console.error("yt-dlp error:", data.toString()));
-  ffmpeg.stderr.on("data", (data) => console.error("ffmpeg error:", data.toString()));
+  // Error handling for yt-dlp
+  ytdlp.stderr.on('data', (data) => {
+    console.error('yt-dlp error:', data.toString());
+  });
 
-  ytdlp.on("close", (code) => {
+  // Error handling for ffmpeg
+  ffmpeg.stderr.on('data', (data) => {
+    console.error('ffmpeg error:', data.toString());
+  });
+
+  // yt-dlp exit
+  ytdlp.on('exit', (code) => {
     if (code !== 0) {
       console.error(`yt-dlp exited with code ${code}`);
-      res.status(500).end();
     }
   });
 
-  ffmpeg.on("close", (code) => {
+  // ffmpeg exit
+  ffmpeg.on('exit', (code) => {
     if (code !== 0) {
       console.error(`ffmpeg exited with code ${code}`);
+      res.status(500).send('ffmpeg error');
     }
-    res.end();
   });
 });
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
+
 
 
 
