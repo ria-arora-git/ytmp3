@@ -10,9 +10,13 @@ app.use(cors());
 
 app.get('/download', (req, res) => {
   const url = req.query.url;
-  if (!url) return res.status(400).send('URL is required');
+
+  if (!url) {
+    return res.status(400).send('No URL provided');
+  }
 
   console.log('🔗 Download request:', url);
+  let responseSent = false;
 
   const ytdlp = spawn('yt-dlp', [
     '-f', 'bestaudio',
@@ -26,18 +30,29 @@ app.get('/download', (req, res) => {
   });
 
   ytdlp.on('error', (err) => {
-    console.error('yt-dlp spawn error:', err.message);
-    res.status(500).send('yt-dlp error');
+    console.error('yt-dlp failed to start:', err.message);
+    if (!responseSent) {
+      res.status(500).send('yt-dlp failed');
+      responseSent = true;
+    }
   });
 
-  let responseSent = false;
+  ytdlp.on('close', (code) => {
+    if (code !== 0 && !responseSent) {
+      res.status(500).send(`yt-dlp exited with code ${code}`);
+      responseSent = true;
+    }
+  });
 
-  res.setHeader('Content-Disposition', 'attachment; filename="audio.mp3"');
-  res.setHeader('Content-Type', 'audio/mpeg');
-
+  // Pipe to ffmpeg
   ffmpeg(ytdlp.stdout)
     .audioCodec('libmp3lame')
     .format('mp3')
+    .on('start', () => {
+      console.log('🎵 Starting conversion');
+      res.setHeader('Content-Disposition', 'attachment; filename="audio.mp3"');
+      res.setHeader('Content-Type', 'audio/mpeg');
+    })
     .on('error', (err) => {
       console.error('ffmpeg error:', err.message);
       if (!responseSent) {
@@ -55,6 +70,7 @@ app.get('/download', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
+
 
 
 
