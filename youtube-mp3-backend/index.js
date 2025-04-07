@@ -8,51 +8,46 @@ const PORT = 8080;
 
 app.use(cors());
 
-app.get('/download', (req, res) => {
-  const url = req.query.url;
+app.get('/download', async (req, res) => {
+  let url = req.query.url;
 
   if (!url) {
-    return res.status(400).send('No URL provided');
+    return res.status(400).send('Missing URL');
   }
 
-  console.log('🔗 Download request:', url);
-  let responseSent = false;
+  // Convert short youtu.be links to full YouTube links
+  url = url.replace('youtu.be/', 'www.youtube.com/watch?v=');
+
+  console.log(`🔗 Download request: ${url}`);
+  console.log(`🎵 Starting conversion`);
 
   const ytdlp = spawn('yt-dlp', [
-    '-f', 'bestaudio',
-    '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-    '-o', '-',
+    '-f', '140', // m4a format
+    '--no-check-certificate',
+    '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:114.0) Gecko/20100101 Firefox/114.0',
+    '--referer', 'https://www.youtube.com',
+    '--add-header', 'Accept-Language: en-US,en;q=0.9',
+    '-o', '-', // output to stdout
     url
   ]);
 
+  let responseSent = false;
+
   ytdlp.stderr.on('data', (data) => {
-    console.error('yt-dlp error:', data.toString());
-  });
-
-  ytdlp.on('error', (err) => {
-    console.error('yt-dlp failed to start:', err.message);
-    if (!responseSent) {
-      res.status(500).send('yt-dlp failed');
-      responseSent = true;
+    const error = data.toString();
+    console.error('yt-dlp error:', error);
+    if (error.includes('ERROR:')) {
+      if (!responseSent) {
+        res.status(500).send('yt-dlp failed to download video');
+        responseSent = true;
+        ytdlp.kill();
+      }
     }
   });
 
-  ytdlp.on('close', (code) => {
-    if (code !== 0 && !responseSent) {
-      res.status(500).send(`yt-dlp exited with code ${code}`);
-      responseSent = true;
-    }
-  });
-
-  // Pipe to ffmpeg
-  ffmpeg(ytdlp.stdout)
+  const command = ffmpeg(ytdlp.stdout)
     .audioCodec('libmp3lame')
     .format('mp3')
-    .on('start', () => {
-      console.log('🎵 Starting conversion');
-      res.setHeader('Content-Disposition', 'attachment; filename="audio.mp3"');
-      res.setHeader('Content-Type', 'audio/mpeg');
-    })
     .on('error', (err) => {
       console.error('ffmpeg error:', err.message);
       if (!responseSent) {
@@ -63,13 +58,18 @@ app.get('/download', (req, res) => {
     .on('end', () => {
       console.log('✅ Conversion finished');
       responseSent = true;
-    })
-    .pipe(res, { end: true });
+    });
+
+  res.setHeader('Content-Disposition', 'attachment; filename="audio.mp3"');
+  res.setHeader('Content-Type', 'audio/mpeg');
+
+  command.pipe(res, { end: true });
 });
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
+
 
 
 
