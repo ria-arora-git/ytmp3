@@ -1,5 +1,18 @@
 FROM node:18
 
+FROM node:18
+
+# install Python and ffmpeg
+RUN apt-get update && \
+    apt-get install -y python3 python3-pip ffmpeg && \
+    ln -s /usr/bin/python3 /usr/bin/python
+
+# setup app
+WORKDIR /app
+COPY . .
+RUN npm install
+RUN
+
 # Install ffmpeg and yt-dlp
 RUN apt-get update && \
     apt-get install -y ffmpeg curl && \
