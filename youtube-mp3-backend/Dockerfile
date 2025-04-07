@@ -1,43 +1,37 @@
-FROM node:18
+# Use the official Node.js image as the base image
+FROM node:20
 
-# Install required system packages
-RUN apt-get update && \
-    apt-get install -y python3 python3-pip ffmpeg curl && \
-    ln -s /usr/bin/python3 /usr/bin/python && \
-    curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
-    chmod a+rx /usr/local/bin/yt-dlp
+# Set the working directory for the backend
+WORKDIR /app/backend
 
-# Set working directory
-WORKDIR /app
-
-# Copy package files and install dependencies
-COPY package*.json ./
+# Copy backend package files and install dependencies
+COPY youtube-mp3-backend/package*.json ./
 RUN npm install
 
-# Copy the rest of the code
-COPY . .
+# Copy backend source files
+COPY youtube-mp3-backend/ .
 
-# Expose app port
-EXPOSE 8080
+# Set the working directory for the frontend
+WORKDIR /app/frontend
 
-# Start server
-CMD ["node", "index.js"]
-
-FROM node:18
-
-# Install ffmpeg
-RUN apt-get update && apt-get install -y ffmpeg
-
-# Create app directory
-WORKDIR /app
-
-# Copy files
-COPY package*.json ./
+# Copy frontend package files and install dependencies
+COPY youtube-mp3-frontend/package*.json ./
 RUN npm install
-COPY . .
 
+# Copy frontend source files
+COPY youtube-mp3-frontend/ .
+
+# Build the frontend
+RUN npm run build
+
+# Set the working directory back to the backend
+WORKDIR /app/backend
+
+# Expose the port the app runs on
 EXPOSE 8080
-CMD ["node", "index.js"]
+
+# Start the backend server
+CMD ["npm", "start"]
 
 
 
