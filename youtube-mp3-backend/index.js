@@ -17,12 +17,15 @@ app.get("/download", async (req, res) => {
     console.log(`🎧 Downloading from: ${url}`);
 
     const ytdlp = spawn("yt-dlp", [
-        "-f", "bestaudio",
-        "-o", "-",
-        "--quiet",
-        "--no-warnings",
-        url
+      "-f", "bestaudio",
+      "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      "--no-check-certificate",
+      "-o", "-",
+      "--quiet",
+      "--no-warnings",
+      url
     ]);
+    
 
     const ffmpeg = spawn("ffmpeg", [
         "-i", "pipe:0",
