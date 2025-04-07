@@ -1,16 +1,26 @@
-FROM node:18-slim
+# Use Node as base image
+FROM node:18
 
+# Install ffmpeg and yt-dlp
+RUN apt-get update && \
+    apt-get install -y ffmpeg curl && \
+    curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
+    chmod a+rx /usr/local/bin/yt-dlp
+
+# Set working directory
 WORKDIR /app
+
+# Copy project files
 COPY . .
 
-RUN apt-get update && \
-    apt-get install -y ffmpeg python3 && \
-    npm install
+# Install dependencies
+RUN npm install
 
+# Expose the port your app runs on
 EXPOSE 8080
-CMD ["npm", "start"]
 
-
+# Start the app
+CMD ["node", "index.js"]
 
 
 
