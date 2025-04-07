@@ -22,12 +22,12 @@ app.get("/download", async (req, res) => {
   const ytdlp = spawn("yt-dlp", [
     "-f", "bestaudio",
     "--no-playlist",
-    "--geo-bypass",
-    "--add-header", "Referer: https://www.youtube.com/",
-    "--add-header", "User-Agent: Mozilla/5.0",
+    "--user-agent", "Mozilla/5.0",
+    "--referer", "https://www.youtube.com/",
     "-o", "-",
-    cleanUrl
+    url
   ]);
+  
 
   // Spawn ffmpeg
   const ffmpeg = spawn("ffmpeg", [

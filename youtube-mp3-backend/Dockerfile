@@ -1,28 +1,30 @@
-FROM node:18-slim
+FROM node:18
 
-# Install yt-dlp, ffmpeg, python
+# Install dependencies for yt-dlp and ffmpeg
 RUN apt-get update && apt-get install -y \
-    ffmpeg \
     python3 \
-    yt-dlp \
-    && ln -s /usr/bin/python3 /usr/bin/python \
-    && rm -rf /var/lib/apt/lists/*
+    python3-pip \
+    ffmpeg \
+    curl && \
+    ln -s /usr/bin/python3 /usr/bin/python
+
+# Use latest yt-dlp instead of pip version
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
+    chmod a+rx /usr/local/bin/yt-dlp
 
 # Set working directory
 WORKDIR /app
 
-# Install Node dependencies
+# Copy package files and install Node deps
 COPY package*.json ./
 RUN npm install
 
-# Copy rest of the app
+# Copy source
 COPY . .
 
-# Expose port
-EXPOSE 8080
-
-# Run the app
+# Start app
 CMD ["node", "index.js"]
+
 
 
 
